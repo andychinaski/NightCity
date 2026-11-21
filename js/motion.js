@@ -6,13 +6,7 @@
   const WALK_SPEED = 180;
   const CAR_FPS = 36;
   const WALK_FPS = 8;
-  const layers = {
-    far: { distanceFactor: 8 / STREET_SPEED, cameraFactor: .25 },
-    middle: { distanceFactor: 65 / STREET_SPEED, cameraFactor: .55 },
-    street: { distanceFactor: 1, cameraFactor: 1 },
-  };
-
-  function create({ width, streetCount, walkerWidth }) {
+  function create({ width, streetCount, walkerWidth, viewLeft = 0, viewRight = width }) {
     const routeLength = width * streetCount;
     let animationTime = 0;
     let carTime = 0;
@@ -29,13 +23,14 @@
       worldDistance += travel;
 
       if (worldDistance >= nextWalkerSpawn) {
-        walkerX = width;
+        walkerX = viewRight;
         nextWalkerSpawn += routeLength;
       }
       if (walkerX !== null) {
         walkerX -= travel + WALK_SPEED * dt;
-        if (walkerX < -walkerWidth) walkerX = null;
+        if (walkerX < viewLeft - walkerWidth) walkerX = null;
       }
+      return travel;
     }
 
     return {
@@ -48,5 +43,5 @@
     };
   }
 
-  app.motion = { create, layers };
+  app.motion = { create, streetSpeed: STREET_SPEED };
 })(window.NightCity = window.NightCity || {});

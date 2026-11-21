@@ -1,4 +1,4 @@
-// Canvas 2D rendering from the current motion state and manual camera offsets.
+// Canvas 2D rendering from simulation state and the projected camera pose.
 (function (app) {
   'use strict';
 
@@ -8,18 +8,23 @@
     const H = canvas.height;
     const walkerHeight = H * .24;
     const walkerWidth = walkerHeight * 272 / 724;
-    const { far, middle, street } = app.motion.layers;
+    const { far, middle, street } = app.camera.layers;
 
     function draw(img, x = 0, y = 0, w = W, h = H) {
       if (img.complete && img.naturalWidth) ctx.drawImage(img, x, y, w, h);
     }
 
-    function strip(images, offset, y = 0) {
+    function strip(images, offset, y, extendGround = false) {
       const span = W * images.length;
-      let start = ((offset % span) + span) % span;
+      const start = ((Math.round(offset) % span) + span) % span;
       let index = Math.floor(start / W), x = -(start % W);
       while (x < W) {
-        draw(images[index % images.length], x, y);
+        const image = images[index % images.length];
+        draw(image, x, y);
+        if (extendGround && y < 0 && image.complete && image.naturalWidth) {
+          // Continue the pavement edge into the sliver exposed below the tile.
+          ctx.drawImage(image, 0, image.naturalHeight - 1, image.naturalWidth, 1, x, y + H, W, -y);
+        }
         x += W;
         index++;
       }
@@ -56,17 +61,20 @@
       ctx.restore();
     }
 
-    function render(motion, horizontal, vertical) {
-      const x = horizontal * W / 100;
+    function render(motion, camera) {
       const { worldDistance, carFrame, walkerX, walkerFrame, animationTime } = motion;
+      const pan = camera.x + camera.framePan;
+      const distance = worldDistance + pan;
+      const streetY = Math.round(-camera.y * street.y);
       ctx.clearRect(0, 0, W, H);
       draw(images.sky);
-      strip([images.far], worldDistance * far.distanceFactor + x * far.cameraFactor, -480 - vertical * far.cameraFactor);
-      strip(images.middle, worldDistance * middle.distanceFactor + x * middle.cameraFactor, -300 - vertical * middle.cameraFactor);
-      strip(images.streets, worldDistance * street.distanceFactor + x * street.cameraFactor);
-      draw(images.cars[carFrame % images.cars.length], 0, H * .635, W * .45, W * .45 / 3);
+      strip([images.far], distance * far.x, -480 - Math.round(camera.y * far.y));
+      strip(images.middle, distance * middle.x, -300 - Math.round(camera.y * middle.y));
+      strip(images.streets, distance * street.x, streetY, true);
+      draw(images.cars[carFrame % images.cars.length], -camera.frame, H * .635 + streetY, W * .45, W * .45 / 3);
       if (walkerX !== null) {
-        draw(images.walker[walkerFrame % images.walker.length], walkerX, H * .965 - walkerHeight * .94, walkerWidth, walkerHeight);
+        draw(images.walker[walkerFrame % images.walker.length], walkerX - pan * street.x,
+          H * .965 - walkerHeight * .94 + streetY, walkerWidth, walkerHeight);
       }
       drawRain(animationTime);
     }

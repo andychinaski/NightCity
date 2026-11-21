@@ -5,21 +5,36 @@
   const canvas = document.querySelector('#scene');
   const images = app.assets.loadSceneImages();
   const scene = app.createScene(canvas, images);
+  const camera = app.camera.create(canvas.width, canvas.height);
   const motion = app.motion.create({
     width: canvas.width,
     streetCount: images.streets.length,
     walkerWidth: scene.walkerWidth,
+    viewLeft: -camera.worldViewMargin,
+    viewRight: canvas.width + camera.worldViewMargin,
   });
   let last = null;
-  const controls = app.createControls({ onPlaybackChange: () => { last = null; } });
+  let resetMotionClock = false;
+  const controls = app.createControls({
+    onPlaybackChange(playing) {
+      resetMotionClock = true;
+      camera.setPlaying(playing, controls.horizontal);
+    },
+  });
 
   function tick(now) {
-    if (last !== null && controls.playing) {
+    if (last !== null) {
       const dt = Math.min((now - last) / 1000, .1);
-      motion.advance(dt, controls.speed);
+      const travel = controls.playing && !resetMotionClock ? motion.advance(dt, controls.speed) : 0;
+      // On the first frame after Play, hold the rendered camera pose while the
+      // route clock restarts. Paused camera input still updates every frame.
+      if (!controls.playing || !resetMotionClock) {
+        camera.advance(dt, controls.horizontal, controls.vertical, travel);
+      }
     }
+    resetMotionClock = false;
     last = now;
-    scene.render(motion, controls.horizontal, controls.vertical);
+    scene.render(motion, camera.pose);
     requestAnimationFrame(tick);
   }
 
