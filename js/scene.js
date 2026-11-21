@@ -8,24 +8,36 @@
     const H = canvas.height;
     const walkerHeight = H * .24;
     const walkerWidth = walkerHeight * 272 / 724;
-    const { far, middle, street } = app.camera.layers;
+    const farWidth = Math.round(W * .93);
+    const farHeight = Math.round(H * .93);
+    const { sky, far, middle, street } = app.camera.layers;
 
     function draw(img, x = 0, y = 0, w = W, h = H) {
       if (img.complete && img.naturalWidth) ctx.drawImage(img, x, y, w, h);
     }
 
-    function strip(images, offset, y, extendGround = false) {
-      const span = W * images.length;
+    function drawSky(y) {
+      const image = images.sky;
+      draw(image, 0, y);
+      if (y !== 0 && image.complete && image.naturalWidth) {
+        const top = y > 0;
+        ctx.drawImage(image, 0, top ? 0 : image.naturalHeight - 1, image.naturalWidth, 1,
+          0, top ? 0 : H + y, W, Math.abs(y));
+      }
+    }
+
+    function strip(images, offset, y, { tileWidth = W, tileHeight = H, extendGround = false } = {}) {
+      const span = tileWidth * images.length;
       const start = ((Math.round(offset) % span) + span) % span;
-      let index = Math.floor(start / W), x = -(start % W);
+      let index = Math.floor(start / tileWidth), x = -(start % tileWidth);
       while (x < W) {
         const image = images[index % images.length];
-        draw(image, x, y);
+        draw(image, x, y, tileWidth, tileHeight);
         if (extendGround && y < 0 && image.complete && image.naturalWidth) {
           // Continue the pavement edge into the sliver exposed below the tile.
-          ctx.drawImage(image, 0, image.naturalHeight - 1, image.naturalWidth, 1, x, y + H, W, -y);
+          ctx.drawImage(image, 0, image.naturalHeight - 1, image.naturalWidth, 1, x, y + tileHeight, tileWidth, -y);
         }
-        x += W;
+        x += tileWidth;
         index++;
       }
     }
@@ -67,10 +79,11 @@
       const distance = worldDistance + pan;
       const streetY = Math.round(-camera.y * street.y);
       ctx.clearRect(0, 0, W, H);
-      draw(images.sky);
-      strip([images.far], distance * far.x, -480 - Math.round(camera.y * far.y));
+      drawSky(-Math.round(camera.y * sky.y));
+      strip([images.far], distance * far.x, H - 480 - farHeight - Math.round(camera.y * far.y),
+        { tileWidth: farWidth, tileHeight: farHeight });
       strip(images.middle, distance * middle.x, -300 - Math.round(camera.y * middle.y));
-      strip(images.streets, distance * street.x, streetY, true);
+      strip(images.streets, distance * street.x, streetY, { extendGround: true });
       draw(images.cars[carFrame % images.cars.length], -camera.frame, H * .635 + streetY, W * .45, W * .45 / 3);
       if (walkerX !== null) {
         draw(images.walker[walkerFrame % images.walker.length], walkerX - pan * street.x,

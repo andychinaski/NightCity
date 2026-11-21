@@ -3,8 +3,9 @@
   'use strict';
 
   const layers = {
-    far: { x: 8 / app.motion.streetSpeed, y: .25 },
-    middle: { x: 65 / app.motion.streetSpeed, y: .55 },
+    sky: { y: .05 },
+    far: { x: 10 / app.motion.streetSpeed, y: .15 },
+    middle: { x: 65 / app.motion.streetSpeed, y: .48 },
     street: { x: 1, y: 1 },
   };
   const HORIZONTAL_RESPONSE = .12;
@@ -67,8 +68,8 @@
         pose.frame = pauseFrame + (pose.x - pauseX);
       }
 
-      // Preserve room for the walker's feet when the foreground moves down.
-      const targetY = vertical / 100 * height * (vertical < 0 ? .028 : .070);
+      // Keep the downward travel shorter because the walker is near the bottom edge.
+      const targetY = vertical / 100 * height * (vertical < 0 ? .065 : .135);
       pose.y += (targetY - pose.y) * -Math.expm1(-dt / VERTICAL_RESPONSE);
     }
 
