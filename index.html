@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ночной город — мультфильм</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Обычные defer-скрипты: index.html можно открывать двойным щелчком без сервера. -->
+  <script defer src="js/assets.js"></script>
+  <script defer src="js/motion.js"></script>
+  <script defer src="js/scene.js"></script>
+  <script defer src="js/controls.js"></script>
+  <script defer src="js/main.js"></script>
+</head>
+<body>
+  <main class="player">
+    <div class="scene" aria-label="Мультфильм: автомобиль едет по ночному городу">
+      <canvas id="scene" width="1672" height="941">Ваш браузер не поддерживает отображение мультфильма.</canvas>
+      <div class="intro" id="intro">
+        <h1>Контрольная 4<br>Управляемый мультфильм</h1>
+        <button id="start" type="button" aria-label="Запустить мультфильм">
+          <img src="assets/icons/play.png" alt="">
+        </button>
+      </div>
+      <button class="music" id="music" type="button" aria-label="Выключить музыку" aria-pressed="true">
+        <img src="assets/icons/music_on.png" alt="">
+      </button>
+      <div class="controls" aria-label="Управление мультфильмом">
+        <button id="playback" type="button" aria-label="Пауза" aria-pressed="true">
+          <img src="assets/icons/pause.png" alt="">
+        </button>
+      </div>
+      <div class="status" id="status" role="status"></div>
+      <audio id="track" src="assets/audio/theme.mp3" preload="auto" loop></audio>
+    </div>
+    <div class="adjustments" aria-label="Настройки сцены">
+      <label>Параллакс по горизонтали <output id="x-value">0</output><input id="horizontal" type="range" min="-100" max="100" value="0"></label>
+      <label>Параллакс по вертикали <output id="y-value">0</output><input id="vertical" type="range" min="-100" max="100" value="0"></label>
+      <label>Скорость дороги <output id="speed-value">100%</output><input id="speed" type="range" min="0" max="200" value="100"></label>
+    </div>
+  </main>
+</body>
+</html>

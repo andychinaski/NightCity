@@ -1,0 +1,27 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies and generated files
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.parcel-cache/
+.vite/
+
+# Local logs / temp files
+*.log
+npm-debug.log*
+*.tmp
+*.temp
+*.bak
+*~
+
+# Do not ignore assets/: original PNG and MP3 are required for the scene.
