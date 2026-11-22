@@ -4,15 +4,6 @@
 
   const objectLayers = ['far', 'middle', 'street', 'car', 'foreground'];
 
-  // Bench areas between the foreground posts, measured in the shelter PNG.
-  const benchAreas = [
-    [467, 599, 679, 774],
-    [715, 599, 1057, 774],
-    [1097, 599, 1307, 774],
-  ].map(([left, top, right, bottom]) => [
-    left / 1774, top / 887, (right - left) / 1774, (bottom - top) / 887,
-  ]);
-
   function wrap(value, period) {
     const remainder = value % period;
     return remainder < 0 ? remainder + period : remainder;
@@ -39,16 +30,15 @@
     const busStop = {
       id: 'bus-stop', x: W * 1.57, y: H * .964, width: H * .754, height: H * .377,
       layer: 'foreground', plane: 'street', anchor: { x: 0, y: 850 / 887 },
-      sprite: images.busStop, repeat: false, snap: false,
-      clipAreas: benchAreas, clipOutside: true,
+      sprite: images.busStop, snap: false,
     };
-    const bench = { ...busStop, id: 'bus-stop-bench', clipOutside: false };
     const benchX = busStop.x + busStop.width * (890 / 1774);
     const benchSeatY = busStop.y + (706 / 887 - busStop.anchor.y) * busStop.height;
     const walkerRoute = {
-      spawnDistance: W * .86,
+      routeLength: tilePlanes.street.width * tilePlanes.street.tiles.length,
+      spawnDistance: W * 1.06,
       benchX,
-      startX: benchX + H * .28,
+      startX: benchX + H * .55,
     };
     const standingY = H * .955;
     const walker = {
@@ -58,7 +48,7 @@
     };
     // Align the bottom of the pelvis in sitting_wait/03.png to the seat surface.
     const seatedY = benchSeatY + (walker.anchor.y - 548 / 724) * walkerHeight;
-    const objects = [car, bench, walker, busStop];
+    const objects = [car, walker, busStop];
 
     function draw(img, x = 0, y = 0, w = W, h = H) {
       if (img.complete && img.naturalWidth) ctx.drawImage(img, x, y, w, h);
@@ -116,18 +106,6 @@
 
       if (object.repeat === false || !plane.span) {
         if (left + width <= 0 || left >= W) return;
-        if (object.clipAreas) {
-          ctx.save();
-          ctx.beginPath();
-          if (object.clipOutside) ctx.rect(left, top, width, height);
-          for (const [x, y, w, h] of object.clipAreas) {
-            ctx.rect(left + x * width, top + y * height, w * width, h * height);
-          }
-          ctx.clip('evenodd');
-          draw(image, left, top, width, height);
-          ctx.restore();
-          return;
-        }
         draw(image, left, top, width, height);
         return;
       }

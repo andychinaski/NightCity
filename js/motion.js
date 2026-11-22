@@ -8,13 +8,14 @@
   const WALK_FPS = 8;
   const ACTION_FPS = 5;
 
-  function create({ spawnDistance, startX, benchX, closingFrames, sittingFrames }) {
+  function create({ routeLength, spawnDistance, startX, benchX, closingFrames, sittingFrames }) {
     const closingDuration = closingFrames / ACTION_FPS;
     const sittingDuration = sittingFrames / ACTION_FPS;
     let animationTime = 0;
     let carTime = 0;
     let worldDistance = 0;
-    let walkerWorldX = null;
+    let walkerLap = -1;
+    let walkerX = null;
     let walkerState = 'walking';
     let stateTime = 0;
 
@@ -22,13 +23,13 @@
       if (walkerState === 'waiting') return;
 
       if (walkerState === 'walking') {
-        const timeToBench = (walkerWorldX - benchX) / WALK_SPEED;
+        const timeToBench = (walkerX - benchX) / WALK_SPEED;
         if (dt < timeToBench) {
-          walkerWorldX -= WALK_SPEED * dt;
+          walkerX -= WALK_SPEED * dt;
           stateTime += dt;
           return;
         }
-        walkerWorldX = benchX;
+        walkerX = benchX;
         walkerState = 'closing_umbrella';
         stateTime = 0;
         dt -= timeToBench;
@@ -47,15 +48,23 @@
     function advance(dt, speedPercent) {
       const roadTime = dt * (speedPercent / 100);
       const travel = STREET_SPEED * roadTime;
+      const nextDistance = worldDistance + travel;
+      const nextLap = Math.floor((nextDistance - spawnDistance) / routeLength);
+      // Fast playback must still leave enough of the stop in frame for the actions.
+      const walkerTime = Math.max(dt, roadTime);
       animationTime += dt;
       carTime += roadTime;
-      if (walkerWorldX !== null) {
-        advanceWalker(dt);
-      } else if (travel > 0 && worldDistance + travel >= spawnDistance) {
-        walkerWorldX = startX;
-        advanceWalker(dt * (worldDistance + travel - spawnDistance) / travel);
+      if (travel > 0 && nextLap > walkerLap) {
+        walkerLap = nextLap;
+        walkerX = startX;
+        walkerState = 'walking';
+        stateTime = 0;
+        const distanceAfterSpawn = nextDistance - (spawnDistance + walkerLap * routeLength);
+        advanceWalker(walkerTime * distanceAfterSpawn / travel);
+      } else if (walkerX !== null) {
+        advanceWalker(walkerTime);
       }
-      worldDistance += travel;
+      worldDistance = nextDistance;
       return travel;
     }
 
@@ -73,7 +82,7 @@
           case 'waiting': return sittingFrames - 1;
         }
       },
-      get walkerWorldX() { return walkerWorldX; },
+      get walkerWorldX() { return walkerX === null ? null : walkerX + walkerLap * routeLength; },
     };
   }
 
