@@ -4,13 +4,20 @@
   'use strict';
 
   const root = 'assets/';
+  const frames = (folder, count) => Array.from({ length: count },
+    (_, i) => `${folder}/${String(i + 1).padStart(2, '0')}.png`);
   const paths = Object.freeze({
     sky: 'backgrounds/sky.png',
     far: 'backgrounds/distant-city.png',
     middle: ['backgrounds/middle-city.png', 'backgrounds/middle-city-continuation.png'],
     streets: ['streets/street.png', 'streets/park.png', 'streets/supermarket.png'],
-    cars: Array.from({ length: 8 }, (_, i) => `sprites/car/${String(i + 1).padStart(2, '0')}.png`),
-    walker: Array.from({ length: 8 }, (_, i) => `sprites/walker/${String(i + 1).padStart(2, '0')}.png`),
+    cars: frames('sprites/car', 8),
+    busStop: 'sprites/bus_station.png',
+    walker: {
+      walking: frames('sprites/walker', 8),
+      closing_umbrella: frames('sprites/walker/closing_umbrella', 3),
+      sitting_wait: frames('sprites/walker/sitting_wait', 3),
+    },
     icons: {
       play: 'icons/play.png',
       pause: 'icons/pause.png',
@@ -33,7 +40,8 @@
       middle: paths.middle.map(load),
       streets: paths.streets.map(load),
       cars: paths.cars.map(load),
-      walker: paths.walker.map(load),
+      busStop: load(paths.busStop),
+      walker: Object.fromEntries(Object.entries(paths.walker).map(([state, sequence]) => [state, sequence.map(load)])),
     };
   }
 

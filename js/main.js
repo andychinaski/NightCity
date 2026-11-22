@@ -7,11 +7,9 @@
   const scene = app.createScene(canvas, images);
   const camera = app.camera.create(canvas.width, canvas.height);
   const motion = app.motion.create({
-    width: canvas.width,
-    streetCount: images.streets.length,
-    walkerWidth: scene.walkerWidth,
-    viewLeft: -camera.worldViewMargin,
-    viewRight: canvas.width + camera.worldViewMargin,
+    ...scene.walkerRoute,
+    closingFrames: images.walker.closing_umbrella.length,
+    sittingFrames: images.walker.sitting_wait.length,
   });
   let last = null;
   let resetMotionClock = false;
