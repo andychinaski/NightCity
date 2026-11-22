@@ -68,8 +68,11 @@
         pose.frame = pauseFrame + (pose.x - pauseX);
       }
 
-      // Keep the downward travel shorter because the walker is near the bottom edge.
-      const targetY = vertical / 100 * height * (vertical < 0 ? .065 : .135);
+      const verticalProgress = vertical / 100;
+      // Give the positive range more travel early while keeping its endpoint.
+      const targetY = verticalProgress * height * (vertical < 0
+        ? .065
+        : .135 * (1 + .85 * (1 - verticalProgress)));
       pose.y += (targetY - pose.y) * -Math.expm1(-dt / VERTICAL_RESPONSE);
     }
 

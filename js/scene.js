@@ -17,14 +17,23 @@
     const walkerWidth = walkerHeight * 272 / 724;
     const farWidth = Math.round(W * .93);
     const farHeight = Math.round(H * .93);
+    // All three street PNGs share these ground rows in the 941px source.
+    const roadStart = H * 620 / 941;
+    const nearCurb = H * 867 / 941;
+    const sidewalkBaseColor = '#0e0c23';
+    const roadDepth = nearCurb - roadStart;
+    const roadBands = 12;
+    const sourceRows = Array.from({ length: roadBands + 1 },
+      (_, row) => Math.round(roadStart + roadDepth * row / roadBands));
     const { sky, far, middle, street } = app.camera.layers;
     const tilePlanes = {
       far: { tiles: [images.far], width: farWidth, height: farHeight, y: H - 480 - farHeight, factor: far },
       middle: { tiles: images.middle, width: W, height: H, y: -300, factor: middle },
-      street: { tiles: images.streets, width: W, height: H, y: 0, factor: street, extendGround: true },
+      street: { tiles: images.streets, width: W, height: H, y: 0, factor: street },
     };
     const car = {
-      id: 'car', x: 0, y: H * .635, width: W * .45, height: W * .45 / 3,
+      id: 'car', x: W * .45 / 2, y: H * .635 + (W * .45 / 3) * (700 / 724),
+      width: W * .45, height: W * .45 / 3, anchor: { x: .5, y: 700 / 724 },
       layer: 'car', plane: 'car', sprite: images.cars, frame: 0,
     };
     const busStop = {
@@ -64,44 +73,111 @@
       }
     }
 
-    function strip({ tiles, width, height, extendGround }, { pixelOffset, y, span }) {
+    function strip({ tiles, width, height }, { pixelOffset, y, span }, drawTile = draw) {
       const start = wrap(pixelOffset, span);
       let index = Math.floor(start / width), x = -(start % width);
       while (x < W) {
         const image = tiles[index % tiles.length];
-        draw(image, x, y, width, height);
-        if (extendGround && y < 0 && image.complete && image.naturalWidth) {
-          // Continue the pavement edge into the sliver exposed below the tile.
-          ctx.drawImage(image, 0, image.naturalHeight - 1, image.naturalWidth, 1, x, y + height, width, -y);
-        }
+        drawTile(image, x, y, width, height);
         x += width;
         index++;
       }
     }
 
-    function projectPlanes(worldDistance, camera) {
+    function projectGround(cameraY) {
+      const perspectiveStrength = cameraY > 0 ? 3 : 1;
+      const facadeShift = cameraY * (cameraY < 0 ? .72 : .074) * perspectiveStrength;
+      const curbShift = cameraY * (cameraY < 0 ? 1.72 : .27);
+      // Reframe the stronger projection around the near curb to keep the sidewalk visible.
+      const framingShift = curbShift * (perspectiveStrength - 1);
+      const sidewalkScale = 1 - curbShift / H * .4;
+      const carScale = 1 - curbShift / H * .22;
+
+      function roadY(y) {
+        const depth = (y - roadStart) / roadDepth;
+        const curvature = cameraY < 0 ? .28 : .12;
+        const blend = depth * (1 - curvature * (1 - depth));
+        return y + facadeShift - framingShift + (curbShift * perspectiveStrength - facadeShift) * blend;
+      }
+
+      function sidewalkY(y) {
+        return nearCurb + curbShift + (y - nearCurb) * sidewalkScale;
+      }
+
+      // Share rounded boundaries between adjacent bands and tiles.
+      const destinationRows = sourceRows.map((row, index) =>
+        Math.round(index === roadBands ? sidewalkY(row) : roadY(row)));
+      const tileTop = destinationRows[0] - sourceRows[0];
+      const tileBottom = Math.round(sidewalkY(H));
+
+      function drawStreetTile(img, x, y, w, h) {
+        if (cameraY === 0) {
+          draw(img, x, y, w, h);
+          return;
+        }
+        if (!img.complete || !img.naturalWidth) return;
+
+        const sourceScale = img.naturalHeight / H;
+        function slice(from, to, top, bottom) {
+          ctx.drawImage(img, 0, from * sourceScale, img.naturalWidth, (to - from) * sourceScale,
+            x, top, w, bottom - top);
+        }
+
+        slice(0, sourceRows[0], tileTop, destinationRows[0]);
+        for (let i = 0; i < roadBands; i++) {
+          slice(sourceRows[i], sourceRows[i + 1], destinationRows[i], destinationRows[i + 1]);
+        }
+        slice(sourceRows[roadBands], H, destinationRows[roadBands], tileBottom);
+      }
+
+      function drawStreet(plane) {
+        strip(tilePlanes.street, plane, drawStreetTile);
+        if (tileBottom < H) {
+          // Match the dark edge of the source pavement below the projected tile.
+          ctx.fillStyle = sidewalkBaseColor;
+          ctx.fillRect(0, tileBottom, W, H - tileBottom);
+        }
+      }
+
+      return { facadeShift, framingShift, roadY, sidewalkY, carScale, sidewalkScale, drawStreet };
+    }
+
+    function projectPlanes(worldDistance, camera, ground) {
       const distance = worldDistance + (camera.x + camera.framePan);
       const planes = {};
       for (const [name, plane] of Object.entries(tilePlanes)) {
         const offset = distance * plane.factor.x;
-        const vertical = camera.y * plane.factor.y;
         planes[name] = {
           offset,
           pixelOffset: Math.round(offset),
-          y: plane.y + (name === 'street' ? Math.round(-vertical) : -Math.round(vertical)),
+          y: plane.y + Math.round(ground.facadeShift * plane.factor.y - ground.framingShift),
           span: plane.width * plane.tiles.length,
         };
       }
-      planes.car = { offset: camera.frame, pixelOffset: camera.frame, y: planes.street.y, span: 0 };
+      planes.street.projectY = ground.sidewalkY;
+      planes.street.scale = ground.sidewalkScale;
+      planes.car = {
+        offset: camera.frame, pixelOffset: camera.frame, span: 0,
+        projectY: ground.roadY, scale: ground.carScale,
+      };
       return planes;
     }
 
     function drawObject(object, planes) {
-      const { x, y, width, height, layer, anchor, sprite, frame = 0 } = object;
+      const { x, y, layer, anchor, sprite, frame = 0 } = object;
       const plane = planes[object.plane ?? (tilePlanes[layer] ? layer : 'street')];
       const offset = object.snap === false ? plane.offset : plane.pixelOffset;
-      const left = x - (anchor?.x ?? 0) * width - offset;
-      const top = y - (anchor?.y ?? 0) * height + plane.y;
+      const width = object.width * (plane.scale ?? 1);
+      const height = object.height * (plane.scale ?? 1);
+      const anchorX = anchor?.x ?? 0;
+      let left = x - offset - anchorX * width;
+      if (object.plane === 'street') {
+        // Use the bench of this route cycle as the shared scale origin.
+        const lap = Math.round((x - benchX) / plane.span);
+        const pivot = benchX + lap * plane.span;
+        left = pivot - offset + (x - pivot) * plane.scale - anchorX * width;
+      }
+      const top = (plane.projectY ? plane.projectY(y) : y + plane.y) - (anchor?.y ?? 0) * height;
       const image = Array.isArray(sprite) ? sprite[frame % sprite.length] : sprite;
 
       if (object.repeat === false || !plane.span) {
@@ -149,7 +225,8 @@
 
     function render(motion, camera) {
       const { worldDistance, carFrame, walkerWorldX, walkerState, walkerFrame, animationTime } = motion;
-      const planes = projectPlanes(worldDistance, camera);
+      const ground = projectGround(camera.y);
+      const planes = projectPlanes(worldDistance, camera, ground);
       car.frame = carFrame;
       walker.visible = walkerWorldX !== null;
       walker.x = walkerWorldX;
@@ -160,9 +237,10 @@
       walker.y = standingY + (seatedY - standingY) * sitProgress;
 
       ctx.clearRect(0, 0, W, H);
-      drawSky(-Math.round(camera.y * sky.y));
+      drawSky(Math.round(ground.facadeShift * sky.y - ground.framingShift));
       for (const layer of objectLayers) {
-        if (tilePlanes[layer]) strip(tilePlanes[layer], planes[layer]);
+        if (layer === 'street') ground.drawStreet(planes.street);
+        else if (tilePlanes[layer]) strip(tilePlanes[layer], planes[layer]);
         for (const object of objects) {
           if (object.layer === layer && object.visible !== false) drawObject(object, planes);
         }
